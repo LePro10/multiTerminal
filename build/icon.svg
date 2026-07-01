@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2d3a"/>
+      <stop offset="1" stop-color="#15161d"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e639c"/>
+      <stop offset="1" stop-color="#4ec9b0"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="496" height="496" rx="108" fill="url(#bg)"/>
+  <rect x="8" y="8" width="496" height="496" rx="108" fill="none" stroke="url(#glow)" stroke-width="6" opacity="0.55"/>
+
+  <!-- 2x2 grid of terminal panes -->
+  <g>
+    <!-- top-left: teal -->
+    <rect x="72" y="72" width="168" height="168" rx="20" fill="#0d1117" stroke="#333648" stroke-width="3"/>
+    <rect x="72" y="72" width="168" height="30" rx="20" fill="#4ec9b0"/>
+    <rect x="72" y="82" width="168" height="20" fill="#4ec9b0"/>
+    <circle cx="90" cy="87" r="5" fill="#0d1117" opacity="0.55"/>
+    <text x="156" y="180" font-family="DejaVu Sans Mono, Consolas, monospace" font-size="46" font-weight="700" fill="#4ec9b0" text-anchor="middle">&gt;_</text>
+
+    <!-- top-right: purple -->
+    <rect x="272" y="72" width="168" height="168" rx="20" fill="#0d1117" stroke="#333648" stroke-width="3"/>
+    <rect x="272" y="72" width="168" height="30" rx="20" fill="#c586c0"/>
+    <rect x="272" y="82" width="168" height="20" fill="#c586c0"/>
+    <circle cx="290" cy="87" r="5" fill="#0d1117" opacity="0.55"/>
+    <text x="356" y="180" font-family="DejaVu Sans Mono, Consolas, monospace" font-size="46" font-weight="700" fill="#c586c0" text-anchor="middle">&gt;_</text>
+
+    <!-- bottom-left: amber -->
+    <rect x="72" y="272" width="168" height="168" rx="20" fill="#0d1117" stroke="#333648" stroke-width="3"/>
+    <rect x="72" y="272" width="168" height="30" rx="20" fill="#e0a458"/>
+    <rect x="72" y="282" width="168" height="20" fill="#e0a458"/>
+    <circle cx="90" cy="287" r="5" fill="#0d1117" opacity="0.55"/>
+    <text x="156" y="380" font-family="DejaVu Sans Mono, Consolas, monospace" font-size="46" font-weight="700" fill="#e0a458" text-anchor="middle">&gt;_</text>
+
+    <!-- bottom-right: blue -->
+    <rect x="272" y="272" width="168" height="168" rx="20" fill="#0d1117" stroke="#333648" stroke-width="3"/>
+    <rect x="272" y="272" width="168" height="30" rx="20" fill="#4fa3e3"/>
+    <rect x="272" y="282" width="168" height="20" fill="#4fa3e3"/>
+    <circle cx="290" cy="287" r="5" fill="#0d1117" opacity="0.55"/>
+    <text x="356" y="380" font-family="DejaVu Sans Mono, Consolas, monospace" font-size="46" font-weight="700" fill="#4fa3e3" text-anchor="middle">&gt;_</text>
+  </g>
+</svg>

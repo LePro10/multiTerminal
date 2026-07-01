@@ -1,0 +1,8 @@
+{
+  "name": "omp",
+  "command": "omp",
+  "args": [],
+  "cwd": "~",
+  "color": "#C586C0",
+  "env": {}
+}
