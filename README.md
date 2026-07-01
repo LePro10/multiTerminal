@@ -6,6 +6,16 @@ Built with Electron, [`node-pty`](https://github.com/microsoft/node-pty) (real P
 
 ![icon](build/icon.png)
 
+## Screenshots
+
+| | |
+|---|---|
+| ![toolbar](screenshots/01-empty.png) | ![open folder](screenshots/02-open-folder.png) |
+| Toolbar: templates, split, layout presets, Open Folder, broadcast | **Open Folder…** — one terminal per subfolder, auto-arranged and `cd`'d in |
+
+![broadcast](screenshots/03-broadcast.png)
+*Broadcast — the same command typed once, executed in every pane, each showing its own output*
+
 ## Features
 
 - **Resizable split-pane grid** — add terminals and split them side-by-side (⬌) or stacked (⬍); drag dividers to resize. Panes host fully functional shells via `node-pty`.
@@ -21,6 +31,14 @@ Built with Electron, [`node-pty`](https://github.com/microsoft/node-pty) (real P
 - Build tools for the `node-pty` native addon: `python3`, `make`, `g++` (already required by most dev machines)
 
 ## Getting started
+
+Quick install (Linux/GNOME) — installs dependencies and adds an app-grid/dock launcher with icon:
+
+```bash
+./install.sh
+```
+
+Or just run it without installing a launcher:
 
 ```bash
 npm install
@@ -53,20 +71,6 @@ A common workflow: create a template for a CLI tool (e.g. an AI assistant you ca
 
 ## Desktop integration (Linux/GNOME)
 
-The app ships an icon at `build/icon.png` and can be pinned to the dock like any other app:
+`./install.sh` runs `npm install` and generates `~/.local/share/applications/multiterminal.desktop`, pointing at this repo's `node_modules/electron` binary and using `build/icon.png` as the icon. After running it, multiTerminal shows up in your application grid — right-click it there and choose "Add to Favorites" (or "Pin to Dash") to add it to the dock.
 
-1. Create a `.desktop` file (see below) pointing `Exec` at `node_modules/electron/dist/electron <path-to-this-repo> --no-sandbox` and `Icon` at `build/icon.png`.
-2. Place it in `~/.local/share/applications/` and run `update-desktop-database ~/.local/share/applications`.
-3. Add it to your dock via `gsettings` (`org.gnome.shell favorite-apps`) or by right-clicking it in the app grid.
-
-```ini
-[Desktop Entry]
-Name=multiTerminal
-Comment=Grid of real terminals with templates and broadcast input
-Exec=/path/to/multiterminal/node_modules/electron/dist/electron /path/to/multiterminal --no-sandbox
-Icon=/path/to/multiterminal/build/icon.png
-Terminal=false
-Type=Application
-StartupWMClass=multiterminal
-Categories=Development;TerminalEmulator;
-```
+The script is idempotent, so re-running it after `git pull` (e.g. to pick up dependency updates) is safe.
