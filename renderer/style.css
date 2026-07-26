@@ -163,6 +163,107 @@ button:hover, select:hover {
   padding: 4px;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  width: 560px;
+  max-width: 90vw;
+  height: 480px;
+  max-height: 80vh;
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #000;
+  flex: 0 0 auto;
+}
+
+#folderPathInput {
+  flex: 1;
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  color: #ddd;
+  padding: 5px 8px;
+  border-radius: 3px;
+}
+
+.select-all-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.modal-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.modal-list-empty {
+  padding: 16px;
+  color: #777;
+  text-align: center;
+}
+
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.folder-row:hover {
+  background: #2d2d2d;
+}
+.folder-row .folder-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid #000;
+  flex: 0 0 auto;
+  color: #aaa;
+}
+
+.modal-footer-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-footer-buttons .primary {
+  background: #0e639c;
+  border-color: #0e639c;
+}
+.modal-footer-buttons .primary:hover {
+  background: #1177bb;
+}
+
 .empty-state {
   display: flex;
   align-items: center;

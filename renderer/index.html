@@ -34,7 +34,7 @@
       </select>
     </div>
     <div class="toolbar-group">
-      <button id="openFolderBtn" title="Open one terminal per subfolder, cd'd into each">📁 Open Folder…</button>
+      <button id="openFolderBtn" title="Select one or more folders (Ctrl/Shift-click, or Ctrl+A for all) — one terminal per folder, cd'd in">📁 Open Folder…</button>
     </div>
     <div class="toolbar-group broadcast-group">
       <input id="broadcastInput" type="text" placeholder="Type to broadcast to all terminals…" />
@@ -43,6 +43,24 @@
     </div>
   </div>
   <div id="gridRoot"></div>
+
+  <div id="folderModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <button id="folderUpBtn" title="Go up one directory">⬆</button>
+        <input id="folderPathInput" type="text" title="Press Enter to navigate here" />
+        <label class="select-all-toggle"><input id="folderSelectAll" type="checkbox" /> Select all</label>
+      </div>
+      <div id="folderList" class="modal-list"></div>
+      <div class="modal-footer">
+        <span id="folderSelectedCount">0 selected</span>
+        <div class="modal-footer-buttons">
+          <button id="folderCancelBtn">Cancel</button>
+          <button id="folderOpenBtn" class="primary">Open Terminals</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>

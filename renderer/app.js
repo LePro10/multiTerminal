@@ -19,6 +19,22 @@ const broadcastInput = document.getElementById('broadcastInput');
 const broadcastEnter = document.getElementById('broadcastEnter');
 const broadcastBtn = document.getElementById('broadcastBtn');
 
+const folderModal = document.getElementById('folderModal');
+const folderUpBtn = document.getElementById('folderUpBtn');
+const folderPathInput = document.getElementById('folderPathInput');
+const folderSelectAll = document.getElementById('folderSelectAll');
+const folderList = document.getElementById('folderList');
+const folderSelectedCount = document.getElementById('folderSelectedCount');
+const folderCancelBtn = document.getElementById('folderCancelBtn');
+const folderOpenBtn = document.getElementById('folderOpenBtn');
+
+const folderBrowser = {
+  currentPath: null,
+  parent: null,
+  entries: [],
+  selected: new Map(), // path -> name
+};
+
 async function loadTemplates() {
   state.templates = await window.api.listTemplates();
   templateSelect.innerHTML = '';
@@ -114,6 +130,24 @@ function createPaneRuntime(template, overrides = {}) {
 
   term.onData((data) => window.api.writeTerminal(id, data));
   term.onResize(({ cols, rows }) => window.api.resizeTerminal(id, cols, rows));
+
+  termContainer.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const selection = term.getSelection();
+    if (selection) {
+      window.api.copyToClipboard(selection);
+      term.clearSelection();
+    }
+  });
+
+  term.attachCustomKeyEventHandler((e) => {
+    if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && e.code === 'KeyC') {
+      const selection = term.getSelection();
+      if (selection) window.api.copyToClipboard(selection);
+      return false;
+    }
+    return true;
+  });
 
   pane.unsubData = window.api.onTerminalData(id, (data) => term.write(data));
   pane.unsubExit = window.api.onTerminalExit(id, () => {
@@ -261,22 +295,107 @@ function buildAutoGridTree(paneIds) {
 }
 
 async function openFolderTerminals() {
-  const result = await window.api.pickFolderAndListSubfolders();
-  if (!result) return;
-  if (!result.subfolders || result.subfolders.length === 0) {
-    alert(`No subfolders found in "${result.parent}".`);
-    return;
+  folderBrowser.selected.clear();
+  await navigateFolderBrowser(null);
+  folderModal.style.display = 'flex';
+  folderModal.focus();
+}
+
+async function navigateFolderBrowser(dirPath) {
+  const result = await window.api.listDir(dirPath);
+  folderBrowser.currentPath = result.path;
+  folderBrowser.parent = result.parent;
+  folderBrowser.entries = result.entries;
+  renderFolderBrowser();
+}
+
+function renderFolderBrowser() {
+  folderPathInput.value = folderBrowser.currentPath;
+  folderUpBtn.disabled = !folderBrowser.parent;
+
+  folderList.innerHTML = '';
+  if (folderBrowser.entries.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'modal-list-empty';
+    empty.textContent = 'No subfolders here.';
+    folderList.appendChild(empty);
   }
+  for (const entry of folderBrowser.entries) {
+    const row = document.createElement('div');
+    row.className = 'folder-row';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = folderBrowser.selected.has(entry.path);
+    checkbox.addEventListener('click', (e) => e.stopPropagation());
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) folderBrowser.selected.set(entry.path, entry.name);
+      else folderBrowser.selected.delete(entry.path);
+      updateFolderSelectionUI();
+    });
+
+    const name = document.createElement('span');
+    name.className = 'folder-name';
+    name.textContent = `📁 ${entry.name}`;
+
+    row.appendChild(checkbox);
+    row.appendChild(name);
+    row.addEventListener('click', () => navigateFolderBrowser(entry.path));
+    folderList.appendChild(row);
+  }
+  updateFolderSelectionUI();
+}
+
+function updateFolderSelectionUI() {
+  const allSelected =
+    folderBrowser.entries.length > 0 &&
+    folderBrowser.entries.every((e) => folderBrowser.selected.has(e.path));
+  folderSelectAll.checked = allSelected;
+  folderSelectedCount.textContent = `${folderBrowser.selected.size} selected`;
+}
+
+function closeFolderBrowser() {
+  folderModal.style.display = 'none';
+}
+
+function confirmFolderBrowser() {
+  if (folderBrowser.selected.size === 0) return;
 
   disposeAllPanes();
-
   const template = getSelectedTemplate();
-  const paneIds = result.subfolders.map(
-    (f) => createPaneRuntime(template, { cwd: f.path, name: f.name }).id
+  const paneIds = [...folderBrowser.selected.entries()].map(
+    ([path, name]) => createPaneRuntime(template, { cwd: path, name }).id
   );
   state.tree = buildAutoGridTree(paneIds);
   render();
+  closeFolderBrowser();
 }
+
+folderUpBtn.addEventListener('click', () => {
+  if (folderBrowser.parent) navigateFolderBrowser(folderBrowser.parent);
+});
+folderPathInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') navigateFolderBrowser(folderPathInput.value);
+});
+folderSelectAll.addEventListener('change', () => {
+  if (folderSelectAll.checked) {
+    for (const e of folderBrowser.entries) folderBrowser.selected.set(e.path, e.name);
+  } else {
+    for (const e of folderBrowser.entries) folderBrowser.selected.delete(e.path);
+  }
+  renderFolderBrowser();
+});
+folderCancelBtn.addEventListener('click', closeFolderBrowser);
+folderOpenBtn.addEventListener('click', confirmFolderBrowser);
+folderModal.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeFolderBrowser();
+  if (e.ctrlKey && e.code === 'KeyA' && document.activeElement !== folderPathInput) {
+    e.preventDefault();
+    folderSelectAll.checked = !folderSelectAll.checked;
+    folderSelectAll.dispatchEvent(new Event('change'));
+  }
+});
+folderModal.tabIndex = -1;
 
 function attachDividerDrag(divider, node, index, container) {
   divider.addEventListener('mousedown', (e) => {
