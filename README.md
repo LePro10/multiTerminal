@@ -21,8 +21,9 @@ Built with Electron, [`node-pty`](https://github.com/microsoft/node-pty) (real P
 - **Resizable split-pane grid** — add terminals and split them side-by-side (⬌) or stacked (⬍); drag dividers to resize. Panes host fully functional shells via `node-pty`.
 - **Templates** — JSON files in `templates/` define reusable pane presets (`name`, `command`, `args`, `cwd`, `env`, `color`). Pick one from the toolbar dropdown before adding/splitting a pane. Ships with a `Blank Shell` default and an example `omp` template you can point at your own tool.
 - **Layout presets** — instantly arrange the grid into fixed sizes from 1x1 up to 4x6.
-- **Open Folder…** — pick a parent folder and it opens one terminal per immediate subfolder, each already `cd`'d into its own directory. Panes are auto-arranged in a near-square grid (e.g. 3 subfolders → one row of 3 at 33% each; 5 subfolders → a balanced 3-then-2 layout).
+- **Open Folder…** — pick one or more folders in the dialog (Ctrl/Shift-click, or Ctrl+A to select everything in a directory) and each becomes its own terminal, already `cd`'d in. One folder selected → one terminal; several → one per folder, auto-arranged in a near-square grid (e.g. 3 folders → one row of 3 at 33% each; 5 folders → a balanced 3-then-2 layout). Files selected in the dialog are ignored.
 - **Broadcast input** — type into the top bar and hit "Send to all" (or Enter) to write the same keystrokes into every terminal's PTY at once, with an optional trailing Enter so it executes everywhere simultaneously. Each pane has a "bcast" checkbox to opt out individually.
+- **Copy** — select text and either right-click (copies the selection) or press `Ctrl+Shift+C`. Paste works with the normal `Ctrl+V`.
 - **Per-pane controls** — close, rename via template, and toggle broadcast inclusion per terminal.
 
 ## Requirements

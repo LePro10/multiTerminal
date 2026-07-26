@@ -1,8 +1,9 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, clipboard } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   listTemplates: () => ipcRenderer.invoke('templates:list'),
-  pickFolderAndListSubfolders: () => ipcRenderer.invoke('folder:pickAndListSubfolders'),
+  listDir: (dirPath) => ipcRenderer.invoke('folder:listDir', dirPath),
+  copyToClipboard: (text) => clipboard.writeText(text),
 
   createTerminal: (id, opts) => ipcRenderer.invoke('pty:create', { id, ...opts }),
   writeTerminal: (id, data) => ipcRenderer.send('pty:write', { id, data }),

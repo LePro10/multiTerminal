@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -83,16 +83,23 @@ app.whenReady().then(() => {
 
   ipcMain.handle('templates:list', () => readTemplates());
 
-  ipcMain.handle('folder:pickAndListSubfolders', async () => {
-    const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
-    if (result.canceled || result.filePaths.length === 0) return null;
-    const parent = result.filePaths[0];
-    const subfolders = fs
-      .readdirSync(parent, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => ({ path: path.join(parent, d.name), name: d.name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    return { parent, subfolders };
+  ipcMain.handle('folder:listDir', (event, dirPath) => {
+    let target = expandHome(dirPath || os.homedir());
+    if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
+      target = os.homedir();
+    }
+    let entries = [];
+    try {
+      entries = fs
+        .readdirSync(target, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => ({ path: path.join(target, d.name), name: d.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } catch (_) {
+      // permission denied or unreadable directory: show it empty rather than erroring
+    }
+    const parent = path.dirname(target);
+    return { path: target, parent: parent === target ? null : parent, entries };
   });
 
   ipcMain.handle('pty:create', (event, opts) => {
