@@ -5,7 +5,7 @@
 // shutting the app down cleanly is one call.
 
 const pty = require('node-pty');
-const { expandHome, defaultShell } = require('./store');
+const { resolveCwd, defaultShell } = require('./store');
 
 /** @type {Map<string, {child: import('node-pty').IPty, webContents: Electron.WebContents}>} */
 const sessions = new Map();
@@ -17,7 +17,9 @@ function create(webContents, opts) {
   // we never leak the previous process for the same id.
   destroy(id);
 
-  const shell = command && String(command).trim() ? command : defaultShell();
+  const requestedShell = command && String(command).trim() ? String(command).trim() : null;
+  const shell = requestedShell || defaultShell();
+  const { cwd: workingDir, fellBack, requested } = resolveCwd(cwd);
 
   const childEnv = {
     ...process.env,
@@ -30,18 +32,56 @@ function create(webContents, opts) {
   // still worth setting.
   childEnv.TERM = 'xterm-256color';
 
-  const child = pty.spawn(shell, Array.isArray(args) ? args : [], {
+  const spawnOptions = {
     name: 'xterm-256color',
     // Clamp to something sane: a pane that has not been measured yet must not
     // spawn at 0 columns, which makes most CLIs render garbage.
     cols: Math.max(20, Math.floor(cols) || 80),
     rows: Math.max(5, Math.floor(rows) || 24),
-    cwd: expandHome(cwd),
+    cwd: workingDir,
     env: childEnv,
-  });
+  };
+  const spawnArgs = Array.isArray(args) ? args : [];
+
+  let child;
+  let usedShell = shell;
+  try {
+    child = pty.spawn(shell, spawnArgs, spawnOptions);
+  } catch (err) {
+    // A template pointing at a tool that isn't installed is the common case.
+    // Rather than leaving a dead pane, fall back to a plain shell and let the
+    // renderer say what happened — the user still gets a usable terminal in
+    // the right folder.
+    const fallback = defaultShell();
+    if (requestedShell && fallback !== shell) {
+      child = pty.spawn(fallback, [], spawnOptions);
+      usedShell = fallback;
+      sessions.set(id, { child, webContents });
+      wire(id, child, webContents);
+      return {
+        pid: child.pid,
+        shell: usedShell,
+        cwd: workingDir,
+        warning: `"${shell}" konnte nicht gestartet werden (${err.message}) — stattdessen ${fallback}.`,
+      };
+    }
+    throw new Error(`${err.message} — Shell: ${shell}, Ordner: ${workingDir}`);
+  }
 
   sessions.set(id, { child, webContents });
+  wire(id, child, webContents);
 
+  return {
+    pid: child.pid,
+    shell: usedShell,
+    cwd: workingDir,
+    warning: fellBack
+      ? `Ordner "${requested}" existiert nicht — geöffnet in ${workingDir}.`
+      : null,
+  };
+}
+
+function wire(id, child, webContents) {
   child.onData((data) => {
     if (!webContents.isDestroyed()) webContents.send(`pty:data:${id}`, data);
   });
@@ -50,8 +90,6 @@ function create(webContents, opts) {
     sessions.delete(id);
     if (!webContents.isDestroyed()) webContents.send(`pty:exit:${id}`, { exitCode, signal });
   });
-
-  return { pid: child.pid, shell };
 }
 
 function write(id, data) {
