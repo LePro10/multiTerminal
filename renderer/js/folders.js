@@ -11,12 +11,14 @@ const pickedStrip = document.getElementById('folderPicked');
 const hintEl = document.getElementById('folderHint');
 const showHidden = document.getElementById('folderShowHidden');
 const replaceToggle = document.getElementById('folderReplace');
+const drivesEl = document.getElementById('folderDrives');
 const dropZone = document.getElementById('dropZone');
 
 const view = {
   path: null,
   parent: null,
   entries: [],
+  drives: [],
   /** @type {Map<string, {path:string,name:string}>} */
   picked: new Map(),
   cursor: 0,
@@ -154,12 +156,28 @@ async function navigate(dirPath) {
   view.path = result.path;
   view.parent = result.parent;
   view.entries = result.entries;
+  view.drives = result.drives || [];
   view.error = result.error;
   view.mode = 'browse';
   view.cursor = 0;
   pathInput.value = result.path;
   filterInput.value = '';
+  renderDrives();
   renderList();
+}
+
+// Empty on POSIX, so the row simply collapses.
+function renderDrives() {
+  drivesEl.innerHTML = '';
+  for (const drive of view.drives) {
+    const chip = document.createElement('button');
+    chip.className = 'drive-chip';
+    chip.textContent = drive.replace(/[\\/]+$/, '');
+    chip.title = `Zu ${drive} wechseln`;
+    chip.classList.toggle('active', (view.path || '').toLowerCase().startsWith(drive.toLowerCase()));
+    chip.addEventListener('click', () => navigate(drive));
+    drivesEl.appendChild(chip);
+  }
 }
 
 async function scanProjects() {

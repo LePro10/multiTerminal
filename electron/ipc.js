@@ -22,6 +22,34 @@ const PROJECT_MARKERS = [
   'CLAUDE.md',
 ];
 
+// Windows has no dot-file convention; these are the directories that clutter a
+// drive root and that nobody wants a terminal in.
+const WINDOWS_NOISE = new Set([
+  '$recycle.bin', 'system volume information', 'recovery', 'msocache',
+  '$windows.~ws', '$windows.~bt', 'documents and settings',
+]);
+
+function isHidden(name) {
+  if (name.startsWith('.')) return true;
+  return process.platform === 'win32' && WINDOWS_NOISE.has(name.toLowerCase());
+}
+
+// On Windows the filesystem has no single root, so the folder browser needs the
+// list of drives to let people move between C:, D: and mapped network drives.
+function listDrives() {
+  if (process.platform !== 'win32') return [];
+  const drives = [];
+  for (let code = 'A'.charCodeAt(0); code <= 'Z'.charCodeAt(0); code++) {
+    const root = `${String.fromCharCode(code)}:\\`;
+    try {
+      if (fs.existsSync(root)) drives.push(root);
+    } catch (_) {
+      // Empty removable drive or a disconnected network share.
+    }
+  }
+  return drives;
+}
+
 function describeFolder(fullPath, name) {
   let marker = null;
   for (const candidate of PROJECT_MARKERS) {
@@ -37,7 +65,7 @@ function describeFolder(fullPath, name) {
   return {
     name,
     path: fullPath,
-    hidden: name.startsWith('.'),
+    hidden: isHidden(name),
     isGit: marker === '.git',
     marker,
   };
@@ -75,8 +103,11 @@ function listDir(dirPath) {
   const parent = path.dirname(target);
   return {
     path: target,
+    // At a drive root (Windows) or `/` (POSIX) dirname returns the path
+    // itself; that is the signal there is nothing above it.
     parent: parent === target ? null : parent,
     home: os.homedir(),
+    drives: listDrives(),
     entries,
     error,
   };
@@ -119,10 +150,18 @@ function findProjects(root, maxDepth) {
 function register(getWindow) {
   ipcMain.handle('app:info', () => ({
     platform: process.platform,
+    sep: path.sep,
     home: os.homedir(),
     configDir: store.dir(),
     shell: store.defaultShell(),
   }));
+
+  ipcMain.on('dev:toggleDevTools', () => {
+    const win = getWindow();
+    if (!win) return;
+    if (win.webContents.isDevToolsOpened()) win.webContents.closeDevTools();
+    else win.webContents.openDevTools({ mode: 'bottom' });
+  });
 
   ipcMain.handle('settings:get', () => store.getSettings());
   ipcMain.handle('settings:set', (_e, patch) => store.setSettings(patch));

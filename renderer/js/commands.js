@@ -25,9 +25,15 @@ function focused() {
 export const commands = [
   { id: 'pane.new', title: 'Neues Terminal', group: 'Terminal', keys: 'Ctrl+KeyT',
     run: () => addPane({ template: currentTemplate() }) },
-  { id: 'pane.splitRight', title: 'Rechts teilen', group: 'Terminal', keys: 'Ctrl+Backslash',
+  // Alt+Shift+Arrow is the primary binding because it is the same physical key
+  // on every keyboard layout; Ctrl+\ is kept as an alias for US layouts, where
+  // it is the habit from other terminals. On a German layout `\` needs AltGr,
+  // so it cannot be the only way to split.
+  { id: 'pane.splitRight', title: 'Rechts teilen', group: 'Terminal',
+    keys: ['Alt+Shift+ArrowRight', 'Ctrl+Backslash'],
     run: () => splitPane('row', { template: currentTemplate() }) },
-  { id: 'pane.splitDown', title: 'Unten teilen', group: 'Terminal', keys: 'Ctrl+Shift+Backslash',
+  { id: 'pane.splitDown', title: 'Unten teilen', group: 'Terminal',
+    keys: ['Alt+Shift+ArrowDown', 'Ctrl+Shift+Backslash'],
     run: () => splitPane('col', { template: currentTemplate() }) },
   { id: 'pane.close', title: 'Pane schließen', group: 'Terminal', keys: 'Ctrl+KeyW',
     run: () => { const p = focused(); if (p) closePane(p.id); } },
@@ -101,6 +107,10 @@ export const commands = [
     run: () => bus.emit('templates:reload') },
   { id: 'app.config', title: 'Konfigurationsordner öffnen', group: 'App',
     run: () => api.fs.reveal(state.info.configDir) },
+  // Without a menu bar there is no menu accelerator for these, so they are
+  // bound here instead.
+  { id: 'app.devtools', title: 'Entwicklertools', group: 'App', keys: 'F12',
+    run: () => api.toggleDevTools() },
 ];
 
 for (const group of GROUPS) {
@@ -159,7 +169,8 @@ function eventKey(e) {
 
 export function prettyKey(keys) {
   if (!keys) return '';
-  return keys
+  // A command may declare several bindings; the first one is what the UI shows.
+  return (Array.isArray(keys) ? keys[0] : keys)
     .replace(/\bKey([A-Z])\b/g, '$1')
     .replace(/\bDigit(\d)\b/g, '$1')
     .replace(/\bBackslash\b/, '\\')
@@ -171,9 +182,23 @@ export function prettyKey(keys) {
     .replace(/\+/g, ' + ');
 }
 
+// Declared bindings are normalised into the same modifier order eventKey()
+// produces, so a binding written as "Alt+Shift+ArrowDown" still matches an
+// event that stringifies to "Shift+Alt+ArrowDown".
+function normalizeCombo(combo) {
+  const parts = combo.split('+').map((p) => p.trim()).filter(Boolean);
+  const code = parts.pop();
+  const mods = new Set(parts.map((m) => (m === 'Cmd' || m === 'Meta' ? 'Ctrl' : m)));
+  const ordered = ['Ctrl', 'Shift', 'Alt'].filter((m) => mods.has(m));
+  return [...ordered, code].join('+');
+}
+
 const keyMap = new Map();
 for (const command of commands) {
-  if (command.keys) keyMap.set(command.keys, command.id);
+  if (!command.keys) continue;
+  for (const combo of Array.isArray(command.keys) ? command.keys : [command.keys]) {
+    keyMap.set(normalizeCombo(combo), command.id);
+  }
 }
 
 function isTypingTarget(el) {
@@ -198,8 +223,9 @@ export function initShortcuts() {
       return;
     }
 
-    // Alt+1…9 targets a pane by its header number, from anywhere.
-    const digit = /^Alt\+Digit([1-9])$/.exec(key);
+    // Alt+1…9 targets a pane by its header number, from anywhere. Shift+Alt+N
+    // focuses that pane instead of toggling its selection.
+    const digit = /^(?:Shift\+)?Alt\+Digit([1-9])$/.exec(key);
     if (digit) {
       e.preventDefault();
       const pane = orderedPanes()[Number(digit[1]) - 1];
@@ -212,8 +238,13 @@ export function initShortcuts() {
       return;
     }
 
+    // A pane that has focus makes xterm's hidden textarea the active element,
+    // so "is the user typing" is true almost all the time. Only bare keys must
+    // be handed through to whatever has focus — anything carrying Ctrl or Alt,
+    // and the function keys, is a shortcut and belongs to the app.
     const typing = isTypingTarget(document.activeElement);
-    if (typing && !key.startsWith('Ctrl')) return;
+    const isChord = e.ctrlKey || e.metaKey || e.altKey || /^F\d{1,2}$/.test(e.code);
+    if (typing && !isChord) return;
 
     if (e.key === 'Escape' && !typing) {
       if (state.selection.size > 0) {
