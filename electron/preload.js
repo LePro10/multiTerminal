@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('api', {
     write: (text) => ipcRenderer.send('clipboard:write', text),
   },
 
+  toggleDevTools: () => ipcRenderer.send('dev:toggleDevTools'),
   notify: (title, body) => ipcRenderer.send('notify', { title, body }),
   flashWindow: () => ipcRenderer.send('window:flash'),
   windowControl: (action) => ipcRenderer.send('window:control', action),

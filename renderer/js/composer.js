@@ -129,9 +129,11 @@ async function savePrompt() {
 
 /* --------------------------------------------------------------------- send */
 
+// Handles both POSIX and Windows separators, so {{folder}} is the project name
+// on either platform.
 function basename(p) {
   if (!p) return '';
-  const parts = p.replace(/\/+$/, '').split('/');
+  const parts = p.replace(/[\\/]+$/, '').split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
 
@@ -246,6 +248,9 @@ export function initComposer() {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      // Leaving the composer must not also clear the selection the user just
+      // built up, so this Escape does not reach the global handler.
+      e.stopPropagation();
       input.blur();
       const focused = state.panes.get(state.focusedId);
       focused?.focus();
