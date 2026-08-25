@@ -1,77 +1,205 @@
 # multiTerminal
 
-A desktop app for opening a grid of real terminals in one window — split them like tmux, launch panes from reusable templates, and broadcast the same input to all of them at once.
+A control room for running many terminals — and many AI coding CLIs — side by
+side. Open one terminal per project folder, watch at a glance which of them is
+working and which is waiting for you, and drive a prompt into all of them (or
+just the ones you picked) from a single input.
 
-Built with Electron, [`node-pty`](https://github.com/microsoft/node-pty) (real PTYs, so `cd`, vim, and interactive programs all work normally), and [`xterm.js`](https://github.com/xtermjs/xterm.js).
+Built with Electron, [`node-pty`](https://github.com/microsoft/node-pty) (real
+PTYs, so `cd`, vim and interactive programs work normally) and
+[`xterm.js`](https://github.com/xtermjs/xterm.js).
 
 ![icon](build/icon.png)
 
-## Screenshots
+## Why
 
-| | |
-|---|---|
-| ![toolbar](screenshots/01-empty.png) | ![open folder](screenshots/02-open-folder.png) |
-| Toolbar: templates, split, layout presets, Open Folder, broadcast | **Open Folder…** — one terminal per subfolder, auto-arranged and `cd`'d in |
-
-![broadcast](screenshots/03-broadcast.png)
-*Broadcast — the same command typed once, executed in every pane, each showing its own output*
+Running eight AI coding agents in eight terminal tabs falls apart quickly: you
+can't see which one finished, you re-type the same prompt eight times, and
+alt-tabbing to find the one asking for approval costs more time than the agent
+saved. multiTerminal puts all of them in one grid, tells you which ones need
+you, and gives you one prompt box pointed at exactly the ones you choose.
 
 ## Features
 
-- **Resizable split-pane grid** — add terminals and split them side-by-side (⬌) or stacked (⬍); drag dividers to resize. Panes host fully functional shells via `node-pty`.
-- **Templates** — JSON files in `templates/` define reusable pane presets (`name`, `command`, `args`, `cwd`, `env`, `color`). Pick one from the toolbar dropdown before adding/splitting a pane. Ships with a `Blank Shell` default and an example `omp` template you can point at your own tool.
-- **Layout presets** — instantly arrange the grid into fixed sizes from 1x1 up to 4x6.
-- **Open Folder…** — pick one or more folders in the dialog (Ctrl/Shift-click, or Ctrl+A to select everything in a directory) and each becomes its own terminal, already `cd`'d in. One folder selected → one terminal; several → one per folder, auto-arranged in a near-square grid (e.g. 3 folders → one row of 3 at 33% each; 5 folders → a balanced 3-then-2 layout). Files selected in the dialog are ignored.
-- **Broadcast input** — type into the top bar and hit "Send to all" (or Enter) to write the same keystrokes into every terminal's PTY at once, with an optional trailing Enter so it executes everywhere simultaneously. Each pane has a "bcast" checkbox to opt out individually.
-- **Copy** — select text and either right-click (copies the selection) or press `Ctrl+Shift+C`. Paste works with the normal `Ctrl+V`.
-- **Per-pane controls** — close, rename via template, and toggle broadcast inclusion per terminal.
+### Grid
+
+- **Resizable split grid** — split panes horizontally or vertically, drag the
+  dividers, and the sizes stick. Closing a pane hands its space to its
+  siblings instead of resetting the whole layout.
+- **Layout presets** (1×1 up to 4×4) that **reuse the terminals you already
+  have** instead of killing them. Extra panes are only closed after you
+  confirm.
+- **Zoom** a single pane to full window and back (`Ctrl+Shift+Z`, or
+  double-click its header) — the other panes keep running.
+- **Session restore** — layout, folders, names, groups and mute flags come back
+  the way you left them.
+- New panes inherit the folder of the pane you were in.
+
+### Status, at a glance
+
+Every pane reports what it is doing, and the title bar sums it up:
+
+| Dot | Meaning |
+|---|---|
+| ⚪ grey | Ready — the prompt is back, nothing running |
+| 🟢 green | Output is flowing, the tool is working |
+| 🟠 orange | **Waiting for you** |
+| 🔴 red | The process exited |
+
+"Waiting for you" is detected from the terminal bell, from `OSC 9` / `OSC 777`
+desktop-notification escapes (what most AI CLIs emit when they need input), and
+from the shape of the last lines on screen (`(y/n)`, `Do you want …?`,
+`Press Enter`, password prompts, pagers). When it triggers while the window is
+in the background you get a system notification and the taskbar entry flashes.
+
+Clicking a status chip in the title bar selects every pane in that state — so
+"select everything waiting for me, send `y`" is two clicks.
+
+### Selecting terminals and sending to them
+
+- Click a pane header to select it, `Ctrl+Click` to add, `Shift+Click` for a
+  range, `Alt+1…9` to toggle a pane by its number.
+- Assign panes to **groups A–F** (right-click a header). Groups survive
+  restarts and show up as chips next to the prompt box.
+- The **target chips** decide where a prompt goes: `Alle`, `Auswahl`, or one
+  group. The composer always tells you how many terminals will receive it.
+- Individual panes can be **muted** so `Alle` skips them.
+
+### The prompt composer
+
+- Multi-line: `Enter` sends, `Shift+Enter` adds a line, `↑`/`↓` walks the
+  history.
+- **Placeholders** are expanded per terminal, so one prompt says something
+  different in each pane:
+  `{{folder}}`, `{{path}}`, `{{name}}`, `{{index}}`, `{{count}}`, `{{group}}`.
+  For example `Read the README in {{folder}} and summarise it` sends the right
+  folder name to each agent.
+- **Prompt library** — save the prompt you're typing (☆), then it's one click
+  (or `Shift+Click` to send immediately). Right-click a chip to delete it.
+- **Quick keys** for the things AI CLIs constantly ask for: `⏎`, `y`, `n`, `1`,
+  `esc`, `^C`, repeat-last-command, `clear` — all sent to the current targets.
+  Panes that are waiting for you also grow their own small `y n ⏎ esc ^C` bar.
+- **Stagger** (Settings → Senden) puts a delay between targets so you don't
+  fire ten API calls in the same millisecond.
+
+### Opening folders
+
+Three ways, all of which create one terminal per folder, already `cd`'d in:
+
+1. **Built-in browser** (`Ctrl+O`) — type to filter, `↑`/`↓` to move, `Enter`
+   to descend, `Space` to pick, `Backspace` to go up, `Ctrl+A` for everything
+   visible. Folders containing `.git`, `package.json`, `Cargo.toml`, `go.mod`,
+   `CLAUDE.md` and friends are tagged, and **Projekte finden** sweeps up to
+   three levels down and lists every project it finds — that is the fast way to
+   turn a workspace directory into a full grid.
+2. **System dialog** — the normal OS folder picker, with multi-select.
+3. **Drag and drop** — drag folders straight out of Nautilus / Finder /
+   Explorer into the window. Dropping a *file* opens its containing folder.
+
+Any pane's folder can be opened in the OS file manager with `Ctrl+Shift+E`.
+
+### Everything else
+
+- **Command palette** (`Ctrl+K`) — every action, searchable, with its shortcut.
+- **Search inside a pane** (`Ctrl+Shift+F`) with match highlighting.
+- Copy with `Ctrl+Shift+C` or right-click on a selection; paste with
+  `Ctrl+Shift+V` or right-click with nothing selected.
+- Clickable URLs, GPU-accelerated rendering with a DOM fallback.
+- A pane whose process exits offers a **Restart** button rather than going dead.
+
+## Keyboard shortcuts
+
+| | |
+|---|---|
+| `Ctrl+K` | Command palette |
+| `Ctrl+T` | New terminal |
+| `Ctrl+\` / `Ctrl+Shift+\` | Split right / split down |
+| `Ctrl+W` | Close pane |
+| `Ctrl+Shift+Z` | Zoom pane |
+| `Ctrl+O` / `Ctrl+Shift+O` | Folder browser / system dialog |
+| `Ctrl+Shift+E` | Reveal pane's folder in the file manager |
+| `Ctrl+L` | Jump to the prompt box |
+| `Alt+1…9` | Toggle selection of pane N (`Shift` to focus it instead) |
+| `Ctrl+Shift+A` | Select all panes |
+| `Esc` | Clear the selection |
+| `Alt+←↑↓→` | Move focus between panes |
+| `F2` | Rename pane |
+| `Ctrl+Shift+F` | Search in pane |
+| `Ctrl+,` | Settings |
 
 ## Requirements
 
 - Node.js and npm
-- Build tools for the `node-pty` native addon: `python3`, `make`, `g++` (already required by most dev machines)
+- Build tools for the `node-pty` native addon: `python3`, `make`, `g++`
 
 ## Getting started
 
-Quick install (Linux/GNOME) — installs dependencies and adds an app-grid/dock launcher with icon:
+Quick install (Linux/GNOME) — installs dependencies and adds an app-grid/dock
+launcher with icon:
 
 ```bash
 ./install.sh
 ```
 
-Or just run it without installing a launcher:
+Or just run it:
 
 ```bash
 npm install
 npm start
 ```
 
-On Linux, `npm start` runs Electron with `--no-sandbox`. This is needed unless your system's `node_modules/electron/dist/chrome-sandbox` binary is owned by `root` with the setuid bit (`chmod 4755`) — most dev machines aren't set up that way, so the flag is the simpler path for local use.
+On Linux `npm start` passes `--no-sandbox`, which is needed unless
+`node_modules/electron/dist/chrome-sandbox` is owned by root with the setuid
+bit set.
 
 ## Templates
 
-Add a `.json` file to `templates/` to make it selectable from the toolbar dropdown:
+A template is a reusable pane preset. Bundled ones live in `templates/`; your
+own go in `~/.config/multiterminal/templates/` (Settings → *Templates-Ordner
+öffnen*), and a user template with the same filename shadows a bundled one.
 
 ```json
 {
-  "name": "omp",
-  "command": "omp",
+  "name": "Claude Code",
+  "command": "",
   "args": [],
-  "cwd": "~",
-  "color": "#C586C0",
+  "cwd": "",
+  "color": "#d97757",
+  "initialInput": "claude",
   "env": {}
 }
 ```
 
-- `command`/`args` — what to launch in the pane (defaults to your `$SHELL`)
-- `cwd` — starting directory (`~` expands to your home directory)
-- `color` — accent color shown in the pane header
-- `env` — extra environment variables merged into the pane's process
+- `command` / `args` — what to launch. Empty means your `$SHELL`.
+- `cwd` — starting directory (`~` expands; empty means "inherit").
+- `color` — accent colour for the pane.
+- `initialInput` — typed into the pane once it has started. Launching a CLI
+  this way (rather than as `command`) means you still have a working shell if
+  the tool isn't installed.
+- `env` — extra environment variables.
 
-A common workflow: create a template for a CLI tool (e.g. an AI assistant you can pick a different model in per-terminal), open several panes from it, configure each manually, then use **Broadcast** to send the same prompt into all of them at once.
+The shipped **Claude Code** template plus **Open folders → Projekte finden** is
+the intended workflow: point it at your projects directory, select the repos
+you want, and you get one agent per repo in one grid.
+
+## Where your data lives
+
+Everything is in Electron's user-data directory — `~/.config/multiterminal` on
+Linux — so the repo stays clean and `git pull` never touches your setup:
+
+| File | Contents |
+|---|---|
+| `settings.json` | Preferences |
+| `session.json` | Last layout, folders, names, groups |
+| `prompts.json` | Prompt library |
+| `recent-folders.json` | Recently opened folders |
+| `templates/` | Your own templates |
 
 ## Desktop integration (Linux/GNOME)
 
-`./install.sh` runs `npm install` and generates `~/.local/share/applications/multiterminal.desktop`, pointing at this repo's `node_modules/electron` binary and using `build/icon.png` as the icon. After running it, multiTerminal shows up in your application grid — right-click it there and choose "Add to Favorites" (or "Pin to Dash") to add it to the dock.
-
-The script is idempotent, so re-running it after `git pull` (e.g. to pick up dependency updates) is safe.
+`./install.sh` runs `npm install` and writes
+`~/.local/share/applications/multiterminal.desktop` pointing at this repo's
+Electron binary, using `build/icon.png` as the icon. After running it,
+multiTerminal appears in your application grid — right-click it there and
+choose "Add to Favorites" / "Pin to Dash". The script is idempotent, so
+re-running it after `git pull` is safe.
