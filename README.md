@@ -126,7 +126,7 @@ Any pane's folder can be opened in the OS file manager with `Ctrl+Shift+E`.
 |---|---|
 | `Ctrl+K` | Command palette |
 | `Ctrl+T` | New terminal |
-| `Ctrl+\` / `Ctrl+Shift+\` | Split right / split down |
+| `Alt+Shift+→` / `Alt+Shift+↓` | Split right / split down (also `Ctrl+\` and `Ctrl+Shift+\` on US layouts) |
 | `Ctrl+W` | Close pane |
 | `Ctrl+Shift+Z` | Zoom pane |
 | `Ctrl+O` / `Ctrl+Shift+O` | Folder browser / system dialog |
@@ -139,31 +139,66 @@ Any pane's folder can be opened in the OS file manager with `Ctrl+Shift+E`.
 | `F2` | Rename pane |
 | `Ctrl+Shift+F` | Search in pane |
 | `Ctrl+,` | Settings |
+| `F12` | Developer tools |
 
 ## Requirements
 
 - Node.js and npm
-- Build tools for the `node-pty` native addon: `python3`, `make`, `g++`
+- **Linux / macOS**: build tools for the `node-pty` native addon — `python3`,
+  `make`, `g++`
+- **Windows**: nothing extra. `node-pty` ships prebuilt binaries for
+  win32-x64/arm64, and the terminal backend is ConPTY (Windows 10 1809 or
+  newer).
 
 ## Getting started
-
-Quick install (Linux/GNOME) — installs dependencies and adds an app-grid/dock
-launcher with icon:
-
-```bash
-./install.sh
-```
-
-Or just run it:
 
 ```bash
 npm install
 npm start
 ```
 
-On Linux `npm start` passes `--no-sandbox`, which is needed unless
-`node_modules/electron/dist/chrome-sandbox` is owned by root with the setuid
-bit set.
+`npm start` picks its own flags per platform: on Linux it adds `--no-sandbox`
+only when `node_modules/electron/dist/chrome-sandbox` is not setuid-root (which
+is the normal state on a dev machine); on Windows and macOS the sandbox stays
+on.
+
+### Desktop launcher
+
+**Linux/GNOME** — installs dependencies and adds an app-grid/dock launcher:
+
+```bash
+./install.sh
+```
+
+**Windows** — installs dependencies and creates Start Menu and Desktop
+shortcuts (add `-NoDesktop` to skip the desktop one):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+Both scripts are idempotent, so re-running them after `git pull` is safe.
+
+## Platform notes
+
+The app runs the same on Linux, Windows and macOS. What differs:
+
+- **Default shell** — `$SHELL` on Unix; on Windows it prefers PowerShell 7
+  (`pwsh.exe`), then Windows PowerShell, then `%COMSPEC%`. Override it per
+  template with `command`.
+- **Folder browser** — on Windows the path bar also shows drive letters, so you
+  can move between `C:`, `D:` and mapped network drives. Drive-root clutter
+  (`$Recycle.Bin`, `System Volume Information`, …) is treated as hidden, the
+  way dot-directories are on Unix.
+- **Closing a pane** — on Unix the closing PTY sends `SIGHUP` to the whole
+  process group. Windows has no equivalent, so the pane's process tree is torn
+  down with `taskkill /T` instead; a dev server started inside a pane will not
+  survive it and hold its port.
+- **Menu bar** — removed on Windows and Linux, because an auto-hiding menu bar
+  reacts to a bare `Alt` press and would swallow `Alt+1…9` and `Alt+Arrow`.
+  macOS keeps a menu bar, as apps there are expected to.
+- **Paths** — `~/projects` and `~\projects` are both accepted anywhere a path
+  is entered, and `{{folder}}` resolves the same on either separator.
 
 ## Templates
 

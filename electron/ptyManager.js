@@ -18,6 +18,18 @@ function create(webContents, opts) {
   destroy(id);
 
   const shell = command && String(command).trim() ? command : defaultShell();
+
+  const childEnv = {
+    ...process.env,
+    ...(env || {}),
+    COLORTERM: 'truecolor',
+    TERM_PROGRAM: 'multiTerminal',
+  };
+  // ConPTY drives the terminal itself and does not read TERM, but plenty of
+  // cross-platform CLIs check it to decide whether to emit colour, so it is
+  // still worth setting.
+  childEnv.TERM = 'xterm-256color';
+
   const child = pty.spawn(shell, Array.isArray(args) ? args : [], {
     name: 'xterm-256color',
     // Clamp to something sane: a pane that has not been measured yet must not
@@ -25,13 +37,7 @@ function create(webContents, opts) {
     cols: Math.max(20, Math.floor(cols) || 80),
     rows: Math.max(5, Math.floor(rows) || 24),
     cwd: expandHome(cwd),
-    env: {
-      ...process.env,
-      ...(env || {}),
-      TERM: 'xterm-256color',
-      COLORTERM: 'truecolor',
-      TERM_PROGRAM: 'multiTerminal',
-    },
+    env: childEnv,
   });
 
   sessions.set(id, { child, webContents });
@@ -74,7 +80,23 @@ function destroy(id) {
   const session = sessions.get(id);
   if (!session) return;
   sessions.delete(id);
+  const { pid } = session.child;
   try { session.child.kill(); } catch (_) { /* already dead */ }
+
+  // On Unix the PTY closing sends SIGHUP to the whole foreground process
+  // group, so whatever the shell was running dies with it. Windows has no
+  // equivalent: killing the ConPTY host leaves the shell's children (a running
+  // `node`, an AI CLI, a dev server) orphaned and holding ports. taskkill /T
+  // walks the process tree the way SIGHUP would.
+  if (process.platform === 'win32' && pid) {
+    try {
+      require('child_process')
+        .spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+        .on('error', () => { /* taskkill missing — the kill above is all we get */ });
+    } catch (_) {
+      // Nothing more we can do; the pane is gone either way.
+    }
+  }
 }
 
 function has(id) {
