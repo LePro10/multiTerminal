@@ -396,18 +396,24 @@ export class Pane {
     });
     if (!result || result.ok === false) {
       this.ptyStarted = false;
-      this.term.write(`\r\n\x1b[31mStart fehlgeschlagen: ${result?.error || 'unbekannt'}\x1b[0m\r\n`);
+      const detail = result?.error || 'unbekannt';
+      this.term.write(`\r\n\x1b[31mStart fehlgeschlagen: ${detail}\x1b[0m\r\n`);
       this._setStatus('exited');
       this.exited = true;
       this.el.classList.add('exited');
-      this.overlayMsg.textContent = `Start fehlgeschlagen: ${result?.error || 'unbekannt'}`;
+      this.overlayMsg.textContent = `Start fehlgeschlagen: ${detail}`;
       return;
     }
     this.pid = result.pid;
-    if (!this.cwd) {
-      const described = await api.fs.describe(state.info.home);
-      this.cwd = described?.path || state.info.home || '';
+    // The main process has the last word on where the terminal actually
+    // opened: it falls back when the requested folder is gone, so trust its
+    // answer over what this pane asked for.
+    if (result.cwd && result.cwd !== this.cwd) {
+      this.cwd = result.cwd;
       this._renderMeta();
+    }
+    if (result.warning) {
+      this.term.write(`\x1b[33m${result.warning}\x1b[0m\r\n`);
     }
     if (this.pendingInitialInput) {
       const payload = this.pendingInitialInput;

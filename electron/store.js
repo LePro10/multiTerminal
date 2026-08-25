@@ -83,25 +83,75 @@ function expandHome(p) {
   return path.normalize(trimmed);
 }
 
-function defaultShell() {
-  if (process.platform === 'win32') {
-    // PowerShell 7 renders colour and Unicode far better than cmd.exe, so
-    // prefer it, then Windows PowerShell, then whatever COMSPEC points at.
-    for (const candidate of ['pwsh.exe', 'powershell.exe']) {
-      if (whichWindows(candidate)) return candidate;
-    }
-    return process.env.COMSPEC || 'cmd.exe';
+function isDirectory(p) {
+  try {
+    return !!p && fs.statSync(p).isDirectory();
+  } catch (_) {
+    return false;
   }
-  return process.env.SHELL || '/bin/bash';
 }
 
-// node-pty resolves a bare executable name through PATH itself, but we need to
-// know up front whether a shell actually exists before picking it.
-function whichWindows(exe) {
-  const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
-  return dirs.some((dir) => {
-    try { return fs.existsSync(path.join(dir, exe)); } catch (_) { return false; }
-  });
+// CreateProcessW fails with ERROR_DIRECTORY (267) if the working directory it
+// is handed does not exist, is a file, or is a UNC path it cannot enter — and
+// the message it produces ("Cannot create process, error code: 267") says
+// nothing about which of those it was. So the directory is checked here and a
+// usable one is always returned: the request, then the home directory, then
+// the process's own cwd, which is guaranteed to exist because we are in it.
+function resolveCwd(requested) {
+  const candidates = [];
+  if (requested) candidates.push(expandHome(requested));
+  candidates.push(os.homedir(), process.cwd());
+
+  for (const candidate of candidates) {
+    if (isDirectory(candidate)) {
+      return {
+        cwd: candidate,
+        // Only a fallback worth telling the user about: they asked for a
+        // specific folder and did not get it.
+        fellBack: !!requested && candidate !== expandHome(requested),
+        requested: requested ? expandHome(requested) : null,
+      };
+    }
+  }
+  return { cwd: process.cwd(), fellBack: !!requested, requested: requested || null };
+}
+
+// A Windows "App Execution Alias" is a zero-byte reparse point that exists on
+// PATH but cannot be launched by CreateProcess. fs.existsSync says yes to
+// those, so the size is checked too, and the well-known install locations are
+// preferred over whatever PATH happens to resolve.
+function findWindowsExe(exe, wellKnown = []) {
+  const dirs = [...wellKnown, ...(process.env.PATH || '').split(path.delimiter)];
+  for (const dir of dirs.filter(Boolean)) {
+    const full = path.join(dir, exe);
+    try {
+      const stat = fs.statSync(full);
+      if (stat.isFile() && stat.size > 0) return full;
+    } catch (_) {
+      // Not here, or not readable — keep looking.
+    }
+  }
+  return null;
+}
+
+function defaultShell() {
+  if (process.platform !== 'win32') return process.env.SHELL || '/bin/bash';
+
+  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+  const systemRoot = process.env.SystemRoot || 'C:\\Windows';
+
+  // PowerShell 7 renders colour and Unicode far better than cmd.exe, so it
+  // wins when it is really installed; then Windows PowerShell; then cmd.
+  return findWindowsExe('pwsh.exe', [
+    path.join(programFiles, 'PowerShell', '7'),
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'PowerShell', '7'),
+  ])
+    || findWindowsExe('powershell.exe', [
+      path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0'),
+    ])
+    || findWindowsExe('cmd.exe', [path.join(systemRoot, 'System32')])
+    || process.env.COMSPEC
+    || 'cmd.exe';
 }
 
 function normalizeTemplate(id, parsed, source) {
@@ -217,6 +267,7 @@ function pushRecentFolders(paths) {
 module.exports = {
   dir,
   expandHome,
+  resolveCwd,
   defaultShell,
   getSettings,
   setSettings,
