@@ -11,6 +11,19 @@ PTYs, so `cd`, vim and interactive programs work normally) and
 
 ![icon](build/icon.png)
 
+## Screenshots
+
+![grid](screenshots/01-grid.png)
+*Six projects, one grid. Pane 3 has gone orange — it is asking a question, so
+it grew a `y n ⏎ esc ^C` bar and the title bar says "1 warten auf dich". Panes
+1 and 4 are selected (blue ring), 2 and 5 belong to group C, and the composer
+below reports exactly how many terminals the next prompt will reach.*
+
+| | |
+|---|---|
+| ![folders](screenshots/02-folders.png) | ![broadcast](screenshots/03-broadcast.png) |
+| The folder browser: filter, keyboard navigation, project tags, and a scan that finds every repo below a directory | One prompt, `{{name}}` and `{{index}}` expanded per pane, executed everywhere at once |
+
 ## Why
 
 Running eight AI coding agents in eight terminal tabs falls apart quickly: you
