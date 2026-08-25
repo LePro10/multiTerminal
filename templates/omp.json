@@ -3,6 +3,7 @@
   "command": "omp",
   "args": [],
   "cwd": "~",
-  "color": "#C586C0",
+  "color": "#b884ff",
+  "initialInput": "",
   "env": {}
 }

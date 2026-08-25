@@ -1,0 +1,9 @@
+{
+  "name": "Claude Code",
+  "command": "",
+  "args": [],
+  "cwd": "",
+  "color": "#d97757",
+  "initialInput": "claude",
+  "env": {}
+}
