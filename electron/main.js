@@ -10,10 +10,18 @@ const store = require('./store');
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
 
+// On Windows and Linux the menu bar is removed entirely rather than merely
+// hidden: an auto-hiding menu bar reacts to a bare Alt press, which would eat
+// the app's own Alt+1…9 and Alt+Arrow shortcuts. Chromium still handles
+// clipboard and editing shortcuts inside text fields without a menu, and the
+// few accelerators worth keeping (devtools, zoom) are bound in the renderer.
+// macOS is different — an app there is expected to have a menu bar, and
+// cut/copy/paste in inputs genuinely depend on it — so it keeps one.
 function buildMenu() {
-  // The default Electron menu is noise for a terminal app, but dropping the
-  // menu entirely also drops the accelerators the OS routes through it. Keep a
-  // hidden, minimal menu so copy/paste/zoom/devtools still work.
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null);
+    return;
+  }
   const template = [
     {
       label: 'multiTerminal',
@@ -59,7 +67,7 @@ function createWindow() {
     minHeight: 480,
     title: 'multiTerminal',
     backgroundColor: '#0b0d10',
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     show: false,
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
     webPreferences: {
@@ -71,7 +79,7 @@ function createWindow() {
     },
   });
 
-  win.setMenuBarVisibility(false);
+  if (process.platform !== 'darwin') win.removeMenu();
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   win.once('ready-to-show', () => win.show());
@@ -118,6 +126,9 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(() => {
+    // Without an explicit AppUserModelId, Windows silently drops notifications
+    // from an unpackaged Electron app and shows no taskbar identity.
+    if (process.platform === 'win32') app.setAppUserModelId('dev.multiterminal.app');
     buildMenu();
     ipc.register(() => mainWindow);
     createWindow();

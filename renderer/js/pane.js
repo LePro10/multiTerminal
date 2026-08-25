@@ -46,7 +46,9 @@ const WAITING_PATTERNS = [
   /--More--|\(END\)/,
 ];
 
-const SHELL_PROMPT = /[$#%❯➜»]\s*$/;
+// A prompt back on the last line means the command finished. Covers POSIX
+// shells, and PowerShell / cmd, which both end their prompt with `>`.
+const SHELL_PROMPT = /(?:[$#%❯➜»]|[A-Za-z]:\\[^\n]*>|PS [^\n]*>)\s*$/;
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -57,13 +59,17 @@ function el(tag, className, text) {
 
 // Pane headers are narrow, so show the tail of the path — the part that
 // actually identifies the project — rather than an ellipsised prefix.
+// Splits on either separator so a Windows path shortens the same way.
 function shortenPath(p, home) {
   if (!p) return '';
+  const sep = state.info.sep || '/';
   if (home && p === home) return '~';
-  const rooted = home && p.startsWith(`${home}/`) ? `~${p.slice(home.length)}` : p;
-  const parts = rooted.split('/').filter(Boolean);
+  const rooted = home && p.toLowerCase().startsWith(`${home.toLowerCase()}${sep}`)
+    ? `~${p.slice(home.length)}`
+    : p;
+  const parts = rooted.split(/[\\/]/).filter(Boolean);
   if (parts.length <= 2) return rooted;
-  return `…/${parts.slice(-2).join('/')}`;
+  return `…${sep}${parts.slice(-2).join(sep)}`;
 }
 
 export class Pane {
@@ -283,7 +289,9 @@ export class Pane {
     this.term.onBell(() => this.raiseAttention('Terminal-Glocke'));
     this.term.onTitleChange((title) => {
       this.termTitle = title;
-      if (title && title.startsWith('/')) this.setCwd(title);
+      // Many shells put the cwd in the window title. Accept a POSIX path or a
+      // Windows drive path, but nothing else — a title is free-form text.
+      if (title && (title.startsWith('/') || /^[A-Za-z]:[\\/]/.test(title))) this.setCwd(title);
     });
     if (state.settings.copyOnSelect) {
       this.term.onSelectionChange(() => {
@@ -296,9 +304,13 @@ export class Pane {
     // pane header honest after the user cd's around.
     this.term.parser.registerOscHandler(7, (data) => {
       const match = /^file:\/\/[^/]*(\/.*)$/.exec(data || '');
-      if (match) {
-        try { this.setCwd(decodeURIComponent(match[1])); } catch (_) { this.setCwd(match[1]); }
-      }
+      if (!match) return true;
+      let dir = match[1];
+      try { dir = decodeURIComponent(dir); } catch (_) { /* keep it encoded */ }
+      // A Windows shell reports file:///C:/Users/me — strip the leading slash
+      // that belongs to the URL, not to the path.
+      if (/^\/[A-Za-z]:/.test(dir)) dir = dir.slice(1).replace(/\//g, '\\');
+      this.setCwd(dir);
       return true;
     });
     // OSC 9 / OSC 777 are the two common "desktop notification" escapes. AI
@@ -482,13 +494,10 @@ export class Pane {
       this.raiseAttention('Wartet auf Eingabe');
       return;
     }
-    // A bare shell prompt means the command finished — that is "idle", and for
-    // a pane that was busy it is worth a nudge.
-    const wasRunning = this.status === 'running';
+    // A bare shell prompt means the command finished, so the pane is ready
+    // again rather than merely quiet.
+    this.atShellPrompt = SHELL_PROMPT.test(tail.trimEnd());
     this._setStatus('idle');
-    if (wasRunning && SHELL_PROMPT.test(tail.trimEnd())) {
-      bus.emit('pane:finished', this);
-    }
   }
 
   _readTail(lines = 6) {
@@ -606,8 +615,9 @@ export class Pane {
   }
 }
 
+// Works for both `/home/me/proj` and `C:\Users\me\proj`.
 function basename(p) {
   if (!p) return '';
-  const parts = p.replace(/\/+$/, '').split('/');
+  const parts = p.replace(/[\\/]+$/, '').split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }

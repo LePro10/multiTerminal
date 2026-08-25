@@ -698,6 +698,21 @@ body.resizing .pane-term { pointer-events: none; }
 }
 #folderPath { flex: 1 1 auto; font-family: var(--font-mono); font-size: 11.5px; }
 
+/* Windows only: drive letters, so the browser is not stuck on one volume. */
+.drive-chips { display: flex; gap: 3px; flex: 0 0 auto; }
+.drive-chips:empty { display: none; }
+.drive-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  color: var(--text-dim);
+}
+.drive-chip:hover { border-color: var(--accent-line); color: var(--text); }
+.drive-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-hi); }
+
 .folder-filterbar {
   display: flex;
   align-items: center;

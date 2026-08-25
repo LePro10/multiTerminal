@@ -76,14 +76,32 @@ function setSettings(patch) {
 
 function expandHome(p) {
   if (!p) return os.homedir();
-  if (p === '~') return os.homedir();
-  if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
-  return p;
+  const trimmed = String(p).trim();
+  if (trimmed === '~') return os.homedir();
+  // Accept both `~/projects` and the `~\projects` a Windows user would type.
+  if (/^~[\\/]/.test(trimmed)) return path.join(os.homedir(), trimmed.slice(2));
+  return path.normalize(trimmed);
 }
 
 function defaultShell() {
-  if (process.platform === 'win32') return process.env.COMSPEC || 'powershell.exe';
+  if (process.platform === 'win32') {
+    // PowerShell 7 renders colour and Unicode far better than cmd.exe, so
+    // prefer it, then Windows PowerShell, then whatever COMSPEC points at.
+    for (const candidate of ['pwsh.exe', 'powershell.exe']) {
+      if (whichWindows(candidate)) return candidate;
+    }
+    return process.env.COMSPEC || 'cmd.exe';
+  }
   return process.env.SHELL || '/bin/bash';
+}
+
+// node-pty resolves a bare executable name through PATH itself, but we need to
+// know up front whether a shell actually exists before picking it.
+function whichWindows(exe) {
+  const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  return dirs.some((dir) => {
+    try { return fs.existsSync(path.join(dir, exe)); } catch (_) { return false; }
+  });
 }
 
 function normalizeTemplate(id, parsed, source) {

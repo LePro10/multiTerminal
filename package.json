@@ -5,8 +5,31 @@
   "main": "electron/main.js",
   "private": true,
   "scripts": {
-    "start": "electron . --no-sandbox",
+    "start": "node scripts/start.js",
     "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "dev.multiterminal.app",
+    "productName": "multiTerminal",
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "templates/**/*",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Development",
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png"
+    }
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
