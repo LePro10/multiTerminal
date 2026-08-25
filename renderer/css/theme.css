@@ -1,0 +1,69 @@
+/* Design tokens. Every colour, radius and shadow in the app comes from here. */
+
+:root {
+  /* Surfaces, darkest to lightest */
+  --bg-app: #0a0c10;
+  --bg-chrome: #10141b;
+  --bg-panel: #141924;
+  --bg-raised: #1a2130;
+  --bg-hover: #212a3b;
+  --bg-active: #27324a;
+  --bg-terminal: #0d1017;
+
+  /* Lines */
+  --line: #1e2634;
+  --line-strong: #2b3648;
+
+  /* Text */
+  --text: #e8edf5;
+  --text-dim: #9aa8bd;
+  --text-faint: #61708a;
+
+  /* Brand + semantics */
+  --accent: #5b9dff;
+  --accent-hi: #7fb4ff;
+  --accent-dim: rgba(91, 157, 255, 0.16);
+  --accent-line: rgba(91, 157, 255, 0.45);
+
+  --running: #3fb950;
+  --running-dim: rgba(63, 185, 80, 0.16);
+  --attention: #ffa028;
+  --attention-dim: rgba(255, 160, 40, 0.16);
+  --idle: #5d6b82;
+  --danger: #f85149;
+  --danger-dim: rgba(248, 81, 73, 0.16);
+  --group: #b884ff;
+
+  /* Shape */
+  --r-sm: 5px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-full: 999px;
+
+  /* Depth */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
+
+  /* Type */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Mono", "SF Mono",
+    "DejaVu Sans Mono", "Liberation Mono", Menlo, Consolas, monospace;
+
+  /* Chrome heights — the grid is positioned off these */
+  --h-titlebar: 34px;
+  --h-toolbar: 44px;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Group accent colours, referenced by .group-N classes and inline styles. */
+:root {
+  --g1: #5b9dff;
+  --g2: #3fb950;
+  --g3: #ffa028;
+  --g4: #b884ff;
+  --g5: #ff6b9d;
+  --g6: #2dd4bf;
+}

@@ -1,166 +1,136 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+'use strict';
+
+const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const pty = require('node-pty');
 
-const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
+const ipc = require('./ipc');
+const ptyManager = require('./ptyManager');
+const store = require('./store');
 
-/** @type {Map<string, import('node-pty').IPty>} */
-const ptys = new Map();
+/** @type {BrowserWindow | null} */
+let mainWindow = null;
 
-function expandHome(p) {
-  if (!p) return os.homedir();
-  if (p === '~') return os.homedir();
-  if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
-  return p;
-}
-
-function defaultShell() {
-  return process.env.SHELL || '/bin/bash';
+function buildMenu() {
+  // The default Electron menu is noise for a terminal app, but dropping the
+  // menu entirely also drops the accelerators the OS routes through it. Keep a
+  // hidden, minimal menu so copy/paste/zoom/devtools still work.
+  const template = [
+    {
+      label: 'multiTerminal',
+      submenu: [
+        {
+          label: 'Konfigurationsordner öffnen',
+          click: () => shell.openPath(store.dir()),
+        },
+        { type: 'separator' },
+        { role: 'quit', label: 'Beenden' },
+      ],
+    },
+    {
+      label: 'Bearbeiten',
+      submenu: [
+        { role: 'copy', label: 'Kopieren' },
+        { role: 'paste', label: 'Einfügen' },
+        { role: 'selectAll', label: 'Alles auswählen' },
+      ],
+    },
+    {
+      label: 'Ansicht',
+      submenu: [
+        { role: 'reload', label: 'Neu laden' },
+        { role: 'toggleDevTools', label: 'Entwicklertools' },
+        { type: 'separator' },
+        { role: 'resetZoom', label: 'Zoom zurücksetzen' },
+        { role: 'zoomIn', label: 'Größer' },
+        { role: 'zoomOut', label: 'Kleiner' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: 'Vollbild' },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1500,
+    height: 950,
+    minWidth: 720,
+    minHeight: 480,
     title: 'multiTerminal',
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#0b0d10',
+    autoHideMenuBar: true,
+    show: false,
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      spellcheck: false,
     },
   });
 
+  win.setMenuBarVisibility(false);
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
-  win.on('closed', () => {
-    for (const p of ptys.values()) {
-      try { p.kill(); } catch (_) { /* already dead */ }
-    }
-    ptys.clear();
+  win.once('ready-to-show', () => win.show());
+
+  win.on('focus', () => {
+    win.flashFrame(false);
+    if (!win.isDestroyed()) win.webContents.send('window:focus', true);
+  });
+  win.on('blur', () => {
+    if (!win.isDestroyed()) win.webContents.send('window:focus', false);
   });
 
+  win.on('closed', () => {
+    mainWindow = null;
+    ptyManager.destroyAll();
+  });
+
+  // Never let a link inside a terminal navigate the app window away.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://')) {
+      event.preventDefault();
+      if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    }
+  });
+
+  mainWindow = win;
   return win;
 }
 
-function readTemplates() {
-  try {
-    if (!fs.existsSync(TEMPLATES_DIR)) return [];
-    return fs
-      .readdirSync(TEMPLATES_DIR)
-      .filter((f) => f.endsWith('.json'))
-      .map((f) => {
-        try {
-          const raw = fs.readFileSync(path.join(TEMPLATES_DIR, f), 'utf8');
-          const parsed = JSON.parse(raw);
-          return {
-            id: f.replace(/\.json$/, ''),
-            name: parsed.name || f.replace(/\.json$/, ''),
-            command: parsed.command || defaultShell(),
-            args: parsed.args || [],
-            cwd: parsed.cwd || '~',
-            env: parsed.env || {},
-            color: parsed.color || '#4EC9B0',
-          };
-        } catch (err) {
-          console.error(`Failed to parse template ${f}:`, err.message);
-          return null;
-        }
-      })
-      .filter(Boolean);
-  } catch (err) {
-    console.error('Failed to read templates dir:', err.message);
-    return [];
-  }
+// A single instance keeps one set of PTYs; a second launch just focuses the
+// existing window instead of orphaning the running terminals.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(() => {
+    buildMenu();
+    ipc.register(() => mainWindow);
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
 }
 
-app.whenReady().then(() => {
-  const win = createWindow();
-
-  ipcMain.handle('templates:list', () => readTemplates());
-
-  ipcMain.handle('folder:listDir', (event, dirPath) => {
-    let target = expandHome(dirPath || os.homedir());
-    if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
-      target = os.homedir();
-    }
-    let entries = [];
-    try {
-      entries = fs
-        .readdirSync(target, { withFileTypes: true })
-        .filter((d) => d.isDirectory())
-        .map((d) => ({ path: path.join(target, d.name), name: d.name }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-    } catch (_) {
-      // permission denied or unreadable directory: show it empty rather than erroring
-    }
-    const parent = path.dirname(target);
-    return { path: target, parent: parent === target ? null : parent, entries };
-  });
-
-  ipcMain.handle('pty:create', (event, opts) => {
-    const { id, command, args, cwd, env, cols, rows } = opts;
-    const shell = command || defaultShell();
-    const child = pty.spawn(shell, args || [], {
-      name: 'xterm-256color',
-      cols: cols || 80,
-      rows: rows || 24,
-      cwd: expandHome(cwd),
-      env: { ...process.env, ...(env || {}) },
-    });
-
-    ptys.set(id, child);
-
-    child.onData((data) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send(`pty:data:${id}`, data);
-      }
-    });
-
-    child.onExit(({ exitCode, signal }) => {
-      ptys.delete(id);
-      if (!event.sender.isDestroyed()) {
-        event.sender.send(`pty:exit:${id}`, { exitCode, signal });
-      }
-    });
-
-    return { pid: child.pid };
-  });
-
-  ipcMain.on('pty:write', (event, { id, data }) => {
-    ptys.get(id)?.write(data);
-  });
-
-  ipcMain.on('pty:resize', (event, { id, cols, rows }) => {
-    try {
-      ptys.get(id)?.resize(cols, rows);
-    } catch (_) {
-      // pane may have already exited
-    }
-  });
-
-  ipcMain.on('pty:kill', (event, { id }) => {
-    try {
-      ptys.get(id)?.kill();
-    } catch (_) {
-      // already dead
-    }
-    ptys.delete(id);
-  });
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
+app.on('before-quit', () => ptyManager.destroyAll());
 
 app.on('window-all-closed', () => {
-  for (const p of ptys.values()) {
-    try { p.kill(); } catch (_) { /* already dead */ }
-  }
-  ptys.clear();
+  ptyManager.destroyAll();
   if (process.platform !== 'darwin') app.quit();
 });
